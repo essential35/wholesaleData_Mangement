@@ -132,10 +132,10 @@ server <- function(input, output) {
     })
     
     # 上下屆 & 組距
-    output$intervals
+    #output$intervals
     
     # 次數分配表
-    output$freqDistriTable
+    #output$freqDistriTable
     
     # download data
     output$dl <- downloadHandler(
