@@ -18,7 +18,7 @@ options(shiny.maxRequestSize=100*1024^2)
 ui <- fluidPage(
 
     # Application title
-    titlePanel("合併批發市場資料"), 
+    titlePanel("合併批發市場資料 & 次數分配表"), 
 
     # Sidebar with a slider input for number of bins 
     sidebarLayout(
@@ -26,15 +26,23 @@ ui <- fluidPage(
             fileInput("files", "上傳批發市場資料", multiple = T,
                       accept = c("xls/xlsx", ".xlsx", ".xls")),
             tags$hr(),
+            
             h3("上傳檔案限制："),
             p("1. 檔案需為「.xls」或「.xlsx」檔。"),
             p("2. 檔案名稱格式為「(蔬菜名字)_(市場簡稱).xls」，
                 例如「小白菜_台中市.xlsx」。"),
             br(),
             br(),
-            h3("Download All Result:"),
+            
+            # 下載合併資料
+            h3("下載合併資料："),
             # download data button
-            downloadButton("dl", "Download")
+            downloadButton("dl", "Download Combine Data"),
+            
+            # 下載所有結果
+            h3("Download All Result:"),
+            downloadButton("dl2","Download All Result"),
+            p("Can't Work yet!!!", style = "color:red")
         ),
 
         # Show a plot of the generated distribution
@@ -43,7 +51,21 @@ ui <- fluidPage(
                 tabPanel("原始資料", 
                          DT::dataTableOutput(outputId = "originData")),
                 tabPanel("所有日資料",
-                         DT::dataTableOutput(outputId = "allDayData"))
+                         DT::dataTableOutput(outputId = "allDayData")),
+                tabPanel("次數分配表",
+                         checkboxGroupInput("VarCheck",
+                                            p("變數選擇："),
+                                            choices = c("交易量(公斤)" = 1,#`交易量(公斤)`,
+                                                       "交易價" = 2,#`交易價`,
+                                                       "交易量漲跌" = 3,#`交易量漲跌`,
+                                                       "交易價漲跌" = 4#`交易價漲跌`)
+                                            ),
+                                            selected = 1),
+                         h3("上下限 & 組距"),
+                         DT::dataTableOutput(outputId = "intervals"),
+                         br(),
+                         h3("次數分配表"),
+                         DT::dataTableOutput(outputId = "freqDistriTable"))
             )
         )
     )
@@ -115,7 +137,8 @@ server <- function(input, output) {
                 `交易量差(公斤)` = `交易量(公斤)` - `前一天交易量(公斤)`,
                 `交易價差` = `交易價` - `前一天交易價`,
                 `交易量漲跌` = `交易量差(公斤)`/`前一天交易量(公斤)`,
-                `交易價漲跌` = `交易價差`/`前一天交易價`
+                `交易價漲跌` = `交易價差`/`前一天交易價`,
+                月份 = as.numeric(月份)
             ) 
         
         all_pq
@@ -131,14 +154,53 @@ server <- function(input, output) {
         df()
     })
     
+    # 上下限 & 間距
+    interval_df <- reactive({
+        source("intergroup.R")  # 引入function: group_inter() 
+        inter_df <- group_inter(df()) 
+        inter_df
+    })
+    
+    output$intervals <- DT::renderDataTable({
+        interval_df() %>%
+            .[which(.$group %in% input$VarCheck),] %>%
+            select(-group) %>%
+            tidyr::spread(., key = variable, value = num)
+        
+    })
+    
+    # 次數分配表
+    freq_df <- reactive({
+        
+        FreqOutputTable <- matrix(ncol = 6) %>% as.data.frame()
+        colnames(FreqOutputTable) <- c("Month", "區間", "次數", 
+                                       "批發市場", "品項", "變數")
+        
+        # 重新整理間距資料
+        #interval <- interval_df() %>%
+        #    .[which(.$group %in% input$VarCheck),] %>%
+        #    select(-group) %>%
+        #    tidyr::spread(., key = variable, value = num)
+        
+        source("frequency_table.R")  
+        # 引入function：freq_group(間距資料, 所有日交易資料,變數選擇數字)
+        
+        for (v in input$VarCheck) {
+            FreqOutputTable <- freq_group(interval_df(), df(), v) %>%
+                rbind(FreqOutputTable, .)
+        }
+        FreqOutputTable <- FreqOutputTable[-1,]
+        FreqOutputTable
+    })
+    
+    #output$freqDistriTable <- DT::renderDataTable({
+        freq_df()
+    })
     
     # download data
     output$dl <- downloadHandler(
-        
-        
         filename = function() {
             "Combine_Data.xlsx"
-            #paste0(input$dl_choice,".xlsx")
         },
         content = function(file) {
             all_pq2 <- list(
@@ -148,6 +210,25 @@ server <- function(input, output) {
             )
             
             write.xlsx(x=all_pq2, file = file)
+        }
+    )
+    
+    output$dl2 <- downloadHandler(
+        filename = function() {
+            "All_Results.xlsx"
+        },
+        content = function(file) {
+            all_pq3 <- list(
+                `原始檔` = df() %>% .[,c(1:7)] %>%
+                    .[which(!is.na(.$`交易量(公斤)`)),],
+                `日交易_含漲跌幅` = df(),
+                `上下限&間距` = interval_df() %>%
+                    .[which(.$group %in% input$VarCheck),] %>%
+                    select(-group) %>%
+                    tidyr::spread(., key = variable, value = num)
+            )
+            
+            write.xlsx(x=all_pq3, file = file)
         }
     )
 }
