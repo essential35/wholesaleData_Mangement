@@ -106,11 +106,7 @@ server <- function(input, output) {
                 mutate(
                     平均價 = as.numeric(平均價),
                     `交易量(公斤)` = as.numeric(`交易量(公斤)`),
-                    `交易量(公噸)` = `交易量(公斤)`/1000,
-                    批發市場 = str_extract(input$files[[i, "name"]],
-                                       "(?<=_)[\u4E00-\u9FFF]+(?=.xls)"),
-                    品項 = str_extract(input$files[[i, "name"]],
-                                     "^[\u4E00-\u9FFF]+(?=_)")
+                    `交易量(公噸)` = `交易量(公斤)`/1000
                 ) %>%
                 tibble::add_column(
                     年 = str_extract(.$交易日期,"^[:digit:]+(?=/)") %>% 
@@ -125,6 +121,12 @@ server <- function(input, output) {
                 select(Date, 月份, `交易量(公斤)`, `交易量(公噸)`, 交易價 = 平均價,
                        批發市場, 品項) %>%
                 left_join(DayTrade,., by=c("Date","月份")) %>%
+                mutate(
+                    批發市場 = str_extract(input$files[[i, "name"]],
+                                       "(?<=_)[\u4E00-\u9FFF]+(?=.xls)"),
+                    品項 = str_extract(input$files[[i, "name"]],
+                                     "^[\u4E00-\u9FFF]+(?=_)")
+                ) %>%
                 rbind(all_pq, .)
         }
         all_pq <- all_pq[-1,] %>%
