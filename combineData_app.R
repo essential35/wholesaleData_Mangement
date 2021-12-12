@@ -18,7 +18,7 @@ options(shiny.maxRequestSize=100*1024^2)
 ui <- fluidPage(
 
     # Application title
-    titlePanel("合併批發市場資料 & 製作次數分配表"), 
+    titlePanel("合併批發市場資料"), 
 
     # Sidebar with a slider input for number of bins 
     sidebarLayout(
@@ -43,29 +43,8 @@ ui <- fluidPage(
                 tabPanel("原始資料", 
                          DT::dataTableOutput(outputId = "originData")),
                 tabPanel("所有日資料",
-                         DT::dataTableOutput(outputId = "allDayData")),
-                tabPanel("上下屆 & 組距",
-                         checkboxGroupInput("VarCheck",
-                                            h4("變數選擇："),
-                                            choices = list("交易量(公斤)" = 1,#`交易量(公斤)`,
-                                                           "交易價" = 2,#`交易價`,
-                                                           "交易量漲跌" = 3,#`交易量漲跌`,
-                                                           "交易價漲跌" = 4#`交易價漲跌`)
-                                                           ),
-                                            selected = 1),
-                         DT::dataTableOutput(outputId = "intervals"))#,
-                #tabPanel("次數分配表",
-                #         checkboxGroupInput("VarCheck",
-                #                            h4("變數選擇："),
-                #                            choices = list("交易量(公斤)" = 1,#`交易量(公斤)`,
-                #                                           "交易價" = 2,#`交易價`,
-                #                                           "交易量漲跌" = 3,#`交易量漲跌`,
-                #                                           "交易價漲跌" = 4#`交易價漲跌`),
-                #                                           ),
-                #                            selected = 1),
-                #         DT::dataTableOutput(outputId = "freqDistriTable"))
+                         DT::dataTableOutput(outputId = "allDayData"))
             )
-           
         )
     )
 )
@@ -118,8 +97,7 @@ server <- function(input, output) {
                 tibble::add_column(
                     Date = str_c(.$年,"/",.$月份,"/",.$日)
                 ) %>%
-                select(Date, 月份, `交易量(公斤)`, `交易量(公噸)`, 交易價 = 平均價,
-                       批發市場, 品項) %>%
+                select(Date, 月份, `交易量(公斤)`, `交易量(公噸)`, 交易價 = 平均價) %>%
                 left_join(DayTrade,., by=c("Date","月份")) %>%
                 mutate(
                     批發市場 = str_extract(input$files[[i, "name"]],
@@ -153,97 +131,20 @@ server <- function(input, output) {
         df()
     })
     
-    # 上下屆 & 組距
-    interval_df <- reactive({
-        interval <- df() %>%
-            group_by(批發市場, 品項) %>%
-            summarise(
-                minQ = min(`交易量(公斤)`, na.rm = T),
-                maxQ = max(`交易量(公斤)`, na.rm = T),
-                interQ = (maxQ - minQ)/10,
-                
-                minP = min(`交易價`, na.rm = T),
-                maxP = max(`交易價`, na.rm = T),
-                interP = (maxP - minP)/10,
-                
-                maxQ_change = max(`交易量漲跌`, na.rm = T),
-                minQ_change = min(`交易量漲跌`, na.rm = T),
-                interQ_change = (maxQ_change - minQ_change)/10,
-                
-                maxP_change = max(`交易價漲跌`, na.rm = T),
-                minP_change = min(`交易價漲跌`, na.rm = T),
-                interP_change = (maxP_change - minP_change)/10,
-                
-                .groups = "drop"
-            ) %>%
-            mutate(
-                位數 = ceiling(interQ) %>% as.character(.) %>% {nchar(.)},
-                interQ2 = ifelse(maxQ >= minQ+9*ceiling(interQ/10^(位數-1))*10^(位數-1),
-                                 round(interQ/10^(位數-1),0)*10^(位數-1),
-                                 round(interQ/10^(位數-2),0)*10^(位數-2)),
-                upQ = round((minQ+9*interQ2)/10^(位數-1),0)*10^(位數-1),
-                lowQ = upQ-interQ2*8,
-                
-                interP2 = round(interP,0),
-                lowP = round(minP+interP2,0),
-                upP = round(lowP+interP2*8,0),
-                
-                interQ_change2 = round(interQ_change, 2),
-                lowQ_change = round(minQ_change+interQ_change2, 2),
-                upQ_change = round(lowQ_change+8*interQ_change2, 2),
-                
-                interP_change2 = round(interP_change, 2),
-                lowP_change = round(minP_change+interP_change2, 2),
-                upP_change = round(lowP_change+8*interP_change2, 2)
-            ) %>%
-            select(批發市場, 品項,
-                       minQ, maxQ, interQ, interQ2, upQ, lowQ,
-                       minP, maxP, interP, interP2, upP, lowP,
-                       minQ_change, maxQ_change, interQ_change, interQ_change2, 
-                       upQ_change, lowQ_change,
-                       minP_change, maxP_change, interP_change, interP_change2, 
-                       upP_change, lowP_change) %>%
-            tidyr::gather(., key = "variable", value = "num",  -批發市場,-品項) %>%
-            mutate(
-                group = ifelse(str_detect(variable, "(Q$|Q2$)"),1, NA) %>%
-                    ifelse(str_detect(variable, "(P$|P2$)"),2, .) %>%
-                    ifelse(str_detect(variable, "Q_change"),3, .) %>%
-                    ifelse(str_detect(variable, "P_change"),4, .)
-            )
-        
-        interval[which(interval$group %in% input$VarCheck),] %>%
-            select(-group) %>%
-            tidyr::spread(., key = variable, value = num)
-    })
-    
-    output$intervals <- DT::renderDataTable(
-        interval_df()
-    )
-    
-    # 次數分配表
-    #freq <- reactive({
-    #    
-    #})
-    
-    #output$freqDistriTable <- DT::renderDataTable(
-    #    freq()
-    #)
     
     # download data
     output$dl <- downloadHandler(
         
         
         filename = function() {
-            "All_Result.xlsx"
+            "Combine_Data.xlsx"
             #paste0(input$dl_choice,".xlsx")
         },
         content = function(file) {
             all_pq2 <- list(
                 `原始檔` = df() %>% .[,c(1:7)] %>%
                     .[which(!is.na(.$`交易量(公斤)`)),],
-                `日交易_含漲跌幅` = df(),
-                `上下屆&間距` = interval_df()#,
-                #`次數分配表` = freq()
+                `日交易_含漲跌幅` = df()
             )
             
             write.xlsx(x=all_pq2, file = file)
