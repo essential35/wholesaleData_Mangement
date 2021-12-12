@@ -9,3 +9,8 @@ Run the below code in Rstudio.
 library(shiny)
 runGitHub("wholesaleData_Mangement", "essential35", ref = "main")
 ```
+or
+```
+# install.packages("shiny")
+shiny::runGitHub("wholesaleData_Mangement", "essential35", ref = "main")
+```
