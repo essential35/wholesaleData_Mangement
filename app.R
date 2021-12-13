@@ -8,6 +8,7 @@
 #
 
 library(shiny)
+library(shinythemes)
 library(dplyr)
 library(stringr)
 library(openxlsx)
@@ -16,10 +17,12 @@ options(shiny.maxRequestSize=100*1024^2)
 
 # Define UI for application that draws a histogram
 ui <- fluidPage(
-
+    theme = shinytheme("cosmo"),
+    
     # Application title
     titlePanel("合併批發市場資料 & 次數分配表"), 
-
+    br(),
+    
     # Sidebar with a slider input for number of bins 
     sidebarLayout(
         sidebarPanel(
