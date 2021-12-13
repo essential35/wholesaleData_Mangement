@@ -72,8 +72,7 @@ ui <- fluidPage(
 )
 
 # Define server logic required to draw a histogram
-server <- function(input, output) {
-    
+server <- function(input, output){
     # data combine
     df <- reactive({
         req(input$files)
@@ -143,7 +142,7 @@ server <- function(input, output) {
         
         all_pq
     })
-
+    
     # 原始資料
     output$originData <- DT::renderDataTable({
         df() %>% .[,c(1:7)] %>% .[which(!is.na(.$`交易量(公斤)`)),]
@@ -194,9 +193,9 @@ server <- function(input, output) {
     })
     
     #output$freqDistriTable <- DT::renderDataTable({
-        freq_df()
-    })
-    
+    #freq_df()
+    #})
+
     # download data
     output$dl <- downloadHandler(
         filename = function() {
@@ -212,7 +211,7 @@ server <- function(input, output) {
             write.xlsx(x=all_pq2, file = file)
         }
     )
-    
+
     output$dl2 <- downloadHandler(
         filename = function() {
             "All_Results.xlsx"
@@ -231,7 +230,9 @@ server <- function(input, output) {
             write.xlsx(x=all_pq3, file = file)
         }
     )
-}
 
+}
+    
+    
 # Run the application 
 shinyApp(ui = ui, server = server)
