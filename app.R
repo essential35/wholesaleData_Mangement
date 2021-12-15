@@ -63,6 +63,8 @@ ui <- fluidPage(
         # Show a plot of the generated distribution
         mainPanel(
             tabsetPanel(
+                tabPanel("輸入資料檢視",
+                         DT::dataTableOutput(outputId = "inputOverview")),
                 tabPanel("原始資料", 
                          DT::dataTableOutput(outputId = "originData")),
                 tabPanel("所有日資料",
@@ -80,6 +82,7 @@ ui <- fluidPage(
 
 # Define server logic required to draw a histogram
 server <- function(input, output){
+    
     # data combine
     df <- reactive({
         req(input$files)
@@ -148,6 +151,35 @@ server <- function(input, output){
             ) 
         
         all_pq
+    })
+    
+    # 輸入資料檢視
+    overview <- reactive({
+        markets <- df()$批發市場 %>% as.factor %>% levels
+        category <- df()$品項 %>% as.factor %>% levels
+        
+        overviewDF <- matrix(ncol = 3) %>% as.data.frame
+        colnames(overviewDF) <- c("批發市場","品項","是否有原始資料")
+        
+        for (m in markets) {
+            for (c in category) {
+                overviewDF <- data.frame(
+                    "批發市場" = m,
+                    "品項" = c,
+                    "是否有原始資料" = df() %>% 
+                        filter((批發市場 == m) & (品項 == c)) %>%
+                        {NROW(.) != 0}
+                ) %>%
+                    rbind(overviewDF,.)
+            }
+        }
+        
+        overviewDF <- overviewDF[-1,]
+        overviewDF
+    })
+    
+    output$inputOverview <- DT::renderDataTable({
+      overview()  
     })
     
     # 原始資料
@@ -220,6 +252,7 @@ server <- function(input, output){
         },
         content = function(file) {
             all_pq2 <- list(
+                `輸入資料檢視` = overview(),
                 `原始檔` = df() %>% .[,c(1:7)] %>%
                     .[which(!is.na(.$`交易量(公斤)`)),],
                 `日交易_含漲跌幅` = df()
@@ -235,6 +268,7 @@ server <- function(input, output){
         },
         content = function(file) {
             all_pq3 <- list(
+                `輸入資料檢視` = overview(),
                 `原始檔` = df() %>% .[,c(1:7)] %>%
                     .[which(!is.na(.$`交易量(公斤)`)),],
                 `日交易_含漲跌幅` = df(),
