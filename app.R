@@ -177,9 +177,10 @@ server <- function(input, output){
     # 次數分配表
     freq_df <- reactive({
         
-        FreqOutputTable <- matrix(ncol = 6) %>% as.data.frame()
+        FreqOutputTable <- matrix(ncol = 6) %>% as.data.frame() 
         colnames(FreqOutputTable) <- c("Month", "區間", "次數", 
                                        "批發市場", "品項", "變數")
+        
         
         source("frequency_table.R")  
         # 引入function：freq_group(品項,批發市場,間距資料,所有日交易資料,變數選擇數字)
@@ -189,9 +190,17 @@ server <- function(input, output){
        
         for (mkt in markets) {
             for (c in category) {
-                for (v in as.numeric(input$VarCheck)) {
-                    FreqOutputTable <- freq_group(c, mkt, interval_df(), df(), v) %>%
-                        rbind(FreqOutputTable, .)
+                
+                inter_df <- interval_df() %>% 
+                    filter((品項 == c) & (批發市場 == mkt))
+                
+                if(NROW(inter_df) == 0){
+                    next()  # if there has no data, then continuously run the next loop.
+                }else{
+                    for (v in as.numeric(input$VarCheck)) {
+                        FreqOutputTable <- freq_group(c, mkt, inter_df, df(), v) %>%
+                            rbind(FreqOutputTable, .)
+                    }
                 }
             }
         }

@@ -1,21 +1,5 @@
 # 製作次數分配表
 
-#freq_group <- function(DFgroup, TradeDF, var_num){
-  
-  # 類別
-#  markets <- TradeDF$批發市場 %>% as.factor %>% levels
-#  category <- TradeDF$品項 %>% as.factor %>% levels
-#  var_name <- c("交易量(公斤)", "交易價", "交易量漲跌", "交易價漲跌")
-#  choice <- var_name[var_num]  # 被選擇的類別
-  
-  # 次數分配表
-#  for (mkt in markets) {
-#    for (c in category) {
-#    }
-#  }
-#  DailyTrade_Freq %>% .[-1,] %>% return()
-#}
-
 freq_group <- function(c, mkt, DFgroup, TradeDF, var_num){
   var_name <- c("交易量(公斤)", "交易價", "交易量漲跌", "交易價漲跌")
   choice <- var_name[var_num]  # 被選擇的類別
@@ -24,32 +8,25 @@ freq_group <- function(c, mkt, DFgroup, TradeDF, var_num){
   DailyTrade_Freq <- matrix(ncol = 6) %>% as.data.frame()
   colnames(DailyTrade_Freq) <- c("Month", "區間", "次數", "批發市場", "品項", "變數")
   
-  
-  # find the correspond upperlimit, lowerlimit, and intergroup
-  inter_df <- DFgroup %>% filter((品項 == c) & (批發市場 == mkt))
-  
-  if(NROW(DFgroup) == 0){
-    next()  # if there has no data, then continuously run the next loop.
-  }else{
-    inter_df2 <- inter_df %>% 
-      filter(group == var_num) %>%
-      filter(str_detect(variable, "(2$|^up|^low)"))
+
+  inter_df2 <- DFgroup %>% 
+    filter(group == var_num) %>%
+    filter(str_detect(variable, "(2$|^up|^low)"))
     
-    # get the correspond intervals
-    #inter <- seq(inter_df2$num[3], inter_df2$num[2], by = inter_df2$num[1])
-    lowLimit <- inter_df2$num[3] %>% as.numeric
-    upLimit <- inter_df2$num[2] %>% as.numeric
-    diff <- inter_df2$num[1] %>% as.numeric
-    i <- 1
-    inter <- c(lowLimit)
-    while ((lowLimit + diff) < upLimit) {
-      i = i + 1
-      lowLimit = lowLimit + diff
-      inter[i] <- lowLimit
-    }
-    
+  # get the correspond intervals
+  #inter <- seq(inter_df2$num[3], inter_df2$num[2], by = inter_df2$num[1])
+  lowLimit <- inter_df2$num[3] %>% as.numeric
+  upLimit <- inter_df2$num[2] %>% as.numeric
+  diff <- inter_df2$num[1] %>% as.numeric
+  i <- 1
+  inter <- c()
+  
+  while (lowLimit < upLimit) {
+    inter[i] <- lowLimit
+    lowLimit = lowLimit + diff
+    i = i + 1
   }
-  
+    
   # get the each month 次數分配表 of the correspond market and category
   for (mon in c(1:12)) {
     df_freq <- TradeDF %>%
@@ -83,5 +60,6 @@ freq_group <- function(c, mkt, DFgroup, TradeDF, var_num){
   }
   
   return(DailyTrade_Freq[-1,])
+
 }
 
