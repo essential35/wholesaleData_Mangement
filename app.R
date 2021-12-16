@@ -63,12 +63,12 @@ ui <- fluidPage(
         # Show a plot of the generated distribution
         mainPanel(
             tabsetPanel(
-                tabPanel("輸入資料檢視",
-                         DT::dataTableOutput(outputId = "inputOverview")),
                 tabPanel("原始資料", 
                          DT::dataTableOutput(outputId = "originData")),
                 tabPanel("所有日資料",
                          DT::dataTableOutput(outputId = "allDayData")),
+                tabPanel("無原始資料的日資料",
+                         DT::dataTableOutput(outputId = "nonData")),
                 tabPanel("次數分配表",
                          h3("上下限 & 組距"),
                          DT::dataTableOutput(outputId = "intervals"),
@@ -83,26 +83,30 @@ ui <- fluidPage(
 # Define server logic required to draw a histogram
 server <- function(input, output){
     
+    everyday <- reactive({
+      # create a dataframe include all dates from 1996/01/01 to 2020/12/31
+      DayTrade <- data.frame(
+        year = c(1996:2020),
+        month = rep(1:12, length(c(1996:2020))),
+        day = rep(1:31, 25*12)
+      ) %>%
+        .[-c(which(.$month %in% c(4,6,9,11) & (.$day > 30)),
+             which((.$month == 2) & (.$year %% 4 == 0) & (.$day > 29)),
+             which((.$month == 2) & (.$year %% 4 != 0) & (.$day > 28))),] %>%
+        mutate(Date = str_c(year, "/", month, "/", day) %>% as.Date(.)) %>%
+        .[order(.$Date),] %>%
+        select(Date, month) %>%
+        rename(., 月份 = month) %>%
+        mutate(Date = as.character(Date) %>% str_replace_all(., "-","/"),
+               月份 = str_extract(Date,"(?<=/)[:digit:]+(?=/)"))
+      
+      DayTrade
+    })
+    
     # data combine
     df <- reactive({
         req(input$files)
-        
-        # create a dataframe include all dates from 1996/01/01 to 2020/12/31
-        DayTrade <- data.frame(
-            year = c(1996:2020),
-            month = rep(1:12, length(c(1996:2020))),
-            day = rep(1:31, 25*12)
-        ) %>%
-            .[-c(which(.$month %in% c(4,6,9,11) & (.$day > 30)),
-                 which((.$month == 2) & (.$year %% 4 == 0) & (.$day > 29)),
-                 which((.$month == 2) & (.$year %% 4 != 0) & (.$day > 28))),] %>%
-            mutate(Date = str_c(year, "/", month, "/", day) %>% as.Date(.)) %>%
-            .[order(.$Date),] %>%
-            select(Date, month) %>%
-            rename(., 月份 = month) %>%
-            mutate(Date = as.character(Date) %>% str_replace_all(., "-","/"),
-                   月份 = str_extract(Date,"(?<=/)[:digit:]+(?=/)"))
-        
+      
         # input all data
         all_pq <- matrix(ncol = 7) %>% as.data.frame()
         colnames(all_pq) <- c("Date","月份","交易量(公斤)","交易量(公噸)",
@@ -129,7 +133,7 @@ server <- function(input, output){
                     Date = str_c(.$年,"/",.$月份,"/",.$日)
                 ) %>%
                 select(Date, 月份, `交易量(公斤)`, `交易量(公噸)`, 交易價 = 平均價) %>%
-                left_join(DayTrade,., by=c("Date","月份")) %>%
+                left_join(everyday(),., by=c("Date","月份")) %>%
                 mutate(
                     批發市場 = str_extract(input$files[[i, "name"]],
                                        "(?<=_)[\u4E00-\u9FFF]+(?=.xls)"),
@@ -138,6 +142,7 @@ server <- function(input, output){
                 ) %>%
                 rbind(all_pq, .)
         }
+        
         all_pq <- all_pq[-1,] %>%
             group_by(批發市場, 品項) %>%
             mutate(
@@ -147,39 +152,70 @@ server <- function(input, output){
                 `交易價差` = `交易價` - `前一天交易價`,
                 `交易量漲跌` = `交易量差(公斤)`/`前一天交易量(公斤)`,
                 `交易價漲跌` = `交易價差`/`前一天交易價`,
-                月份 = as.numeric(月份)
+                月份 = as.numeric(月份),
+                `有無原始資料` = TRUE
             ) 
         
         all_pq
     })
     
-    # 輸入資料檢視
-    overview <- reactive({
-        markets <- df()$批發市場 %>% as.factor %>% levels
-        category <- df()$品項 %>% as.factor %>% levels
-        
-        overviewDF <- matrix(ncol = 3) %>% as.data.frame
-        colnames(overviewDF) <- c("批發市場","品項","是否有原始資料")
-        
-        for (m in markets) {
-            for (c in category) {
-                overviewDF <- data.frame(
-                    "批發市場" = m,
-                    "品項" = c,
-                    "是否有原始資料" = df() %>% 
-                        filter((批發市場 == m) & (品項 == c)) %>%
-                        {NROW(.) != 0}
-                ) %>%
-                    rbind(overviewDF,.)
-            }
-        }
-        
-        overviewDF <- overviewDF[-1,]
-        overviewDF
+    # 無原始資料的日資料
+    nondf <- reactive({
+      
+      # 無原始資料
+      markets <- df()$批發市場 %>% as.factor %>% levels
+      category <- df()$品項 %>% as.factor %>% levels
+      
+      nonData <- matrix(ncol = 14) %>% as.data.frame()
+      colnames(nonData) <- c("Date","月份","交易量(公斤)","交易量(公噸)",
+                             "交易價","批發市場","品項", "前一天交易量(公斤)",
+                             "前一天交易價","交易量差(公斤)","交易價差",
+                             "交易量漲跌","交易價漲跌","有無原始資料")
+      for (m in markets) {
+          for (c in category) {
+              check <- df() %>% filter((品項 == c) & (批發市場 == m))
+            
+              if(NROW(check) == 0){
+                nonData <- everyday() %>%
+                  mutate(
+                    Date = as.character(Date),
+                    月份 = as.numeric(月份),
+                    批發市場 = as.character(m),
+                    品項 = as.character(c),
+                    `交易量(公斤)` = NA, 
+                    `交易量(公噸)` = NA, 
+                    交易價 = NA,
+                    `前一天交易量(公斤)` = NA,
+                    `前一天交易價` = NA,
+                    `交易量差(公斤)` = NA,
+                    `交易價差` = NA,
+                    `交易量漲跌` = NA,
+                    `交易價漲跌` = NA,
+                    `有無原始資料` = FALSE
+                  ) %>%
+                  rbind(nonData,.)
+              }else{
+                next()
+              }
+          }
+      }
+      
+        nonData <- nonData[-1,]
+        nonData
     })
     
-    output$inputOverview <- DT::renderDataTable({
-      overview()  
+    # final all date data
+    finalAllDayTrade <- reactive({
+        if (NROW(nondf()) == 0){
+          df() %>% .[order(.$批發市場),]
+        }else{
+          bind_rows(df(), nondf()) %>% .[order(.$批發市場),]
+        }
+    })
+    
+    # 無原始資料的日資料
+    output$nonData <- DT::renderDataTable({
+        nondf() 
     })
     
     # 原始資料
@@ -189,7 +225,7 @@ server <- function(input, output){
     
     # 所有日資料
     output$allDayData <- DT::renderDataTable({
-        df()
+        finalAllDayTrade()
     })
     
     # 上下限 & 間距
@@ -252,10 +288,9 @@ server <- function(input, output){
         },
         content = function(file) {
             all_pq2 <- list(
-                `輸入資料檢視` = overview(),
                 `原始檔` = df() %>% .[,c(1:7)] %>%
-                    .[which(!is.na(.$`交易量(公斤)`)),],
-                `日交易_含漲跌幅` = df()
+                    .[which(!is.na(.$`交易量(公斤)`)),] %>% .[order(.$批發市場),],
+                `日交易_含漲跌幅` = finalAllDayTrade()
             )
             
             write.xlsx(x=all_pq2, file = file)
@@ -268,10 +303,9 @@ server <- function(input, output){
         },
         content = function(file) {
             all_pq3 <- list(
-                `輸入資料檢視` = overview(),
                 `原始檔` = df() %>% .[,c(1:7)] %>%
                     .[which(!is.na(.$`交易量(公斤)`)),],
-                `日交易_含漲跌幅` = df(),
+                `日交易_含漲跌幅` = finalAllDayTrade(),
                 `上下限_間距` = interval_df() %>%
                     .[which(.$group %in% as.numeric(input$VarCheck)),] %>%
                     select(-group) %>%
