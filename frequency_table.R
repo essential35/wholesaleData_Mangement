@@ -21,10 +21,14 @@ freq_group <- function(c, mkt, DFgroup, TradeDF, var_num){
   i <- 1
   inter <- c()
   
-  while (lowLimit <= upLimit) {
-    inter[i] <- lowLimit
-    lowLimit = lowLimit + diff
-    i = i + 1
+  if (is.na(lowLimit) == T){
+    inter <- 0
+  }else{
+    while (lowLimit <= upLimit) {
+      inter[i] <- lowLimit
+      lowLimit = lowLimit + diff
+      i = i + 1
+    }
   }
     
   # get the each month 次數分配表 of the correspond market and category

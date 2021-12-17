@@ -262,13 +262,13 @@ server <- function(input, output){
                 inter_df <- interval_df() %>% 
                     filter((品項 == c) & (批發市場 == mkt))
                 
-                if(sum(inter_df$`交易量(公斤)`) == 0){
+                if(NROW(inter_df) == 0){
                     next()  # if there has no data, then continuously run the next loop.
                 }else{
-                    for (v in as.numeric(input$VarCheck)) {
-                        FreqOutputTable <- freq_group(c, mkt, inter_df, df(), v) %>%
-                            rbind(FreqOutputTable, .)
-                    }
+                  for (v in as.numeric(input$VarCheck)) {
+                      FreqOutputTable <- freq_group(c, mkt, inter_df, df(), v) %>%
+                          rbind(FreqOutputTable, .)
+                  }
                 }
             }
         }
