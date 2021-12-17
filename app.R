@@ -262,7 +262,7 @@ server <- function(input, output){
                 inter_df <- interval_df() %>% 
                     filter((品項 == c) & (批發市場 == mkt))
                 
-                if(NROW(inter_df) == 0){
+                if(sum(inter_df$`交易量(公斤)`) == 0){
                     next()  # if there has no data, then continuously run the next loop.
                 }else{
                     for (v in as.numeric(input$VarCheck)) {
