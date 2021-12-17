@@ -11,13 +11,13 @@
 請在R studio或終端機開啟r，並運行以下的code。
 
 ```
-# install.packages("shiny")
+# install.packages(c("shiny", "shinythemes","dplyr","stringr","openxlsx","DT","tidyr"))
 library(shiny)
 runGitHub("wholesaleData_Mangement", "essential35", ref = "main")
 ```
 or
 ```
-# install.packages("shiny")
+# install.packages(c("shiny", "shinythemes","dplyr","stringr","openxlsx","DT","tidyr"))
 shiny::runGitHub("wholesaleData_Mangement", "essential35", ref = "main")
 ```
 
