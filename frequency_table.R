@@ -28,6 +28,10 @@ freq_group <- function(c, mkt, DFgroup, TradeDF, var_num){
       inter[i] <- lowLimit
       lowLimit = lowLimit + diff
       i = i + 1
+      
+      if((lowLimit == upLimit) & ((lowLimit+diff) == upLimit)){
+        break()
+      }
     }
   }
     

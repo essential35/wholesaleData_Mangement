@@ -220,7 +220,7 @@ server <- function(input, output){
     
     # 原始資料
     output$originData <- DT::renderDataTable({
-        df() %>% .[,c(1:7)] %>% .[which(!is.na(.$`交易量(公斤)`)),]
+        finalAllDayTrade() %>% .[,c(1:7)] %>% .[which(!is.na(.$`交易量(公斤)`)),]
     })
     
     # 所有日資料
@@ -256,21 +256,23 @@ server <- function(input, output){
         markets <- df()$批發市場 %>% as.factor %>% levels
         category <- df()$品項 %>% as.factor %>% levels
        
-        for (mkt in markets) {
-            for (c in category) {
-                
-                inter_df <- interval_df() %>% 
-                    filter((品項 == c) & (批發市場 == mkt))
-                
-                if(NROW(inter_df) == 0){
-                    next()  # if there has no data, then continuously run the next loop.
-                }else{
-                  for (v in as.numeric(input$VarCheck)) {
+        for (v in as.numeric(input$VarCheck)) {
+          for (mkt in markets) {
+              for (c in category) {
+                  
+                  inter_df <- interval_df() %>% 
+                      filter((品項 == c) & (批發市場 == mkt))
+                  
+                  if(NROW(inter_df) == 0){
+                      next()  # if there has no data, then continuously run the next loop.
+                  }else{
+                    
                       FreqOutputTable <- freq_group(c, mkt, inter_df, df(), v) %>%
                           rbind(FreqOutputTable, .)
+                    
                   }
-                }
-            }
+              }
+          }
         }
         
         FreqOutputTable <- FreqOutputTable[-1,]
@@ -288,7 +290,7 @@ server <- function(input, output){
         },
         content = function(file) {
             all_pq2 <- list(
-                `原始檔` = df() %>% .[,c(1:7)] %>%
+                `原始檔` = finalAllDayTrade() %>% .[,c(1:7)] %>%
                     .[which(!is.na(.$`交易量(公斤)`)),] %>% .[order(.$批發市場),],
                 `日交易_含漲跌幅` = finalAllDayTrade()
             )
@@ -303,7 +305,7 @@ server <- function(input, output){
         },
         content = function(file) {
             all_pq3 <- list(
-                `原始檔` = df() %>% .[,c(1:7)] %>%
+                `原始檔` = finalAllDayTrade() %>% .[,c(1:7)] %>%
                     .[which(!is.na(.$`交易量(公斤)`)),],
                 `日交易_含漲跌幅` = finalAllDayTrade(),
                 `上下限_間距` = interval_df() %>%
