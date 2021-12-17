@@ -21,7 +21,7 @@ freq_group <- function(c, mkt, DFgroup, TradeDF, var_num){
   i <- 1
   inter <- c()
   
-  while (lowLimit < upLimit) {
+  while (lowLimit <= upLimit) {
     inter[i] <- lowLimit
     lowLimit = lowLimit + diff
     i = i + 1

@@ -24,7 +24,7 @@ group_inter <- function(DF){
     ) %>%
     mutate(
       位數 = ceiling(interQ) %>% as.character(.) %>% {nchar(.)},
-      interQ2 = ifelse(maxQ >= minQ+9*ceiling(interQ/10^(位數-1))*10^(位數-1),
+      interQ2 = ifelse(maxQ >= minQ+9*round(interQ/10^(位數-1))*10^(位數-1),
                        round(interQ/10^(位數-1),0)*10^(位數-1),
                        round(interQ/10^(位數-2),0)*10^(位數-2)),
       upQ = round((minQ+9*interQ2)/10^(位數-1),0)*10^(位數-1),
