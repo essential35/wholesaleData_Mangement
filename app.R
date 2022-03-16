@@ -110,8 +110,8 @@ server <- function(input, output){
         req(input$files)
       
         # input all data
-        all_pq <- matrix(ncol = 7) %>% as.data.frame()
-        colnames(all_pq) <- c("Date","月份","交易量(公斤)","交易量(公噸)",
+        all_pq <- matrix(ncol = 8) %>% as.data.frame()
+        colnames(all_pq) <- c("Date","Day","月份","交易量(公斤)","交易量(公噸)",
                               "交易價","批發市場","品項")
         
         for(i in 1:length(input$files[,1])){
@@ -132,9 +132,14 @@ server <- function(input, output){
                     .before = 2
                 ) %>%
                 tibble::add_column(
-                    Date = str_c(.$年,"/",.$月份,"/",.$日)
+                    Date = str_c(.$年,"/",.$月份,"/",.$日),
+                    DayLabel = as.Date(Date) %>% lubridate::wday(., label=TRUE)
                 ) %>%
-                select(Date, 月份, `交易量(公斤)`, `交易量(公噸)`, 交易價 = 平均價) %>%
+                left_join(., 
+                          data.frame(DayLabel = c("Sun","Mon","Tue","Wed","Thu","Fri","Sat"),
+                                     Day = c("週日","週一","週二","週三","週四","週五","週六")),
+                          by="DayLabel") %>%
+                select(Date, Day, 月份, `交易量(公斤)`, `交易量(公噸)`, 交易價 = 平均價) %>%
                 left_join(everyday(),., by=c("Date","月份")) %>%
                 mutate(
                     批發市場 = str_extract(input$files[[i, "name"]],
@@ -168,8 +173,8 @@ server <- function(input, output){
       markets <- df()$批發市場 %>% as.factor %>% levels
       category <- df()$品項 %>% as.factor %>% levels
       
-      nonData <- matrix(ncol = 14) %>% as.data.frame()
-      colnames(nonData) <- c("Date","月份","交易量(公斤)","交易量(公噸)",
+      nonData <- matrix(ncol = 15) %>% as.data.frame()
+      colnames(nonData) <- c("Date","Day","月份","交易量(公斤)","交易量(公噸)",
                              "交易價","批發市場","品項", "前一天交易量(公斤)",
                              "前一天交易價","交易量差(公斤)","交易價差",
                              "交易量漲跌","交易價漲跌","有無原始資料")
@@ -181,6 +186,7 @@ server <- function(input, output){
                 nonData <- everyday() %>%
                   mutate(
                     Date = as.character(Date),
+                    Day = as.numeric(Day),
                     月份 = as.numeric(月份),
                     批發市場 = as.character(m),
                     品項 = as.character(c),
