@@ -26,6 +26,8 @@ ui <- fluidPage(
     # Sidebar with a slider input for number of bins 
     sidebarLayout(
         sidebarPanel(
+            numericInput("startyr", "資料起始年", 1996, min=1996, max=Inf),
+            numericInput("endyr","資料結束年",1996, min=1996, max=Inf),
             fileInput("files", "上傳批發市場資料", multiple = T,
                       accept = c("xls/xlsx", ".xlsx", ".xls")),
             
@@ -86,8 +88,8 @@ server <- function(input, output){
     everyday <- reactive({
       # create a dataframe include all dates from 1996/01/01 to 2020/12/31
       DayTrade <- data.frame(
-        year = c(1996:2020),
-        month = rep(1:12, length(c(1996:2020))),
+        year = c(input$startyr:input$endyr),
+        month = rep(1:12, length(c(input$startyr:input$endyr))),
         day = rep(1:31, 25*12)
       ) %>%
         .[-c(which(.$month %in% c(4,6,9,11) & (.$day > 30)),
