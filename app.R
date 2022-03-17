@@ -207,7 +207,7 @@ server <- function(input, output){
     
     # 原始資料
     output$originData <- DT::renderDataTable({
-        finalAllDayTrade() %>% .[,c(1:8)] %>% .[which(!is.na(.$`交易量(公斤)`)),]
+        finalAllDayTrade() %>% .[which(!is.na(.$`交易量(公斤)`)),]
     })
     
     # 所有日資料
