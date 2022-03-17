@@ -86,11 +86,11 @@ ui <- fluidPage(
 server <- function(input, output){
     
     everyday <- reactive({
-      # create a dataframe include all dates from 1996/01/01 to 2020/12/31
+      # create a dataframe include all dates 
       DayTrade <- data.frame(
         year = c(input$startyr:input$endyr),
         month = rep(1:12, length(c(input$startyr:input$endyr))),
-        day = rep(1:31, 25*12)
+        day = rep(1:31, (input$endyr-input$startyr+1)*12)
       ) %>%
         .[-c(which(.$month %in% c(4,6,9,11) & (.$day > 30)),
              which((.$month == 2) & (.$year %% 4 == 0) & (.$day > 29)),
@@ -132,21 +132,22 @@ server <- function(input, output){
                     .before = 2
                 ) %>%
                 tibble::add_column(
-                    Date = str_c(.$年,"/",.$月份,"/",.$日),
+                    Date = str_c(.$年,"/",.$月份,"/",.$日)
+                ) %>%
+                select(Date, 月份, `交易量(公斤)`, `交易量(公噸)`, 交易價 = 平均價) %>%
+                left_join(everyday(),., by=c("Date","月份")) %>%
+                mutate(
+                    批發市場 = str_extract(input$files[[i, "name"]],
+                                       "(?<=_)[\u4E00-\u9FFF]+(?=.xls)"),
+                    品項 = str_extract(input$files[[i, "name"]],
+                                     "^[\u4E00-\u9FFF]+(?=_)"),
                     DayLabel = as.Date(Date) %>% lubridate::wday(., label=TRUE)
                 ) %>%
                 left_join(., 
                           data.frame(DayLabel = c("Sun","Mon","Tue","Wed","Thu","Fri","Sat"),
                                      Day = c("週日","週一","週二","週三","週四","週五","週六")),
                           by="DayLabel") %>%
-                select(Date, Day, 月份, `交易量(公斤)`, `交易量(公噸)`, 交易價 = 平均價) %>%
-                left_join(everyday(),., by=c("Date","月份")) %>%
-                mutate(
-                    批發市場 = str_extract(input$files[[i, "name"]],
-                                       "(?<=_)[\u4E00-\u9FFF]+(?=.xls)"),
-                    品項 = str_extract(input$files[[i, "name"]],
-                                     "^[\u4E00-\u9FFF]+(?=_)")
-                ) %>%
+                select(Date, Day, 月份, `交易量(公斤)`, `交易量(公噸)`, 交易價, 批發市場, 品項) %>%
                 rbind(all_pq, .)
         }
         
@@ -160,7 +161,7 @@ server <- function(input, output){
                 `交易量漲跌` = `交易量差(公斤)`/`前一天交易量(公斤)`,
                 `交易價漲跌` = `交易價差`/`前一天交易價`,
                 月份 = as.numeric(月份),
-                `有無原始資料` = TRUE
+                `有無原始資料` = ifelse(is.na(`交易量(公斤)`),FALSE,TRUE)
             ) 
         
         all_pq
@@ -173,52 +174,30 @@ server <- function(input, output){
       markets <- df()$批發市場 %>% as.factor %>% levels
       category <- df()$品項 %>% as.factor %>% levels
       
-      nonData <- matrix(ncol = 15) %>% as.data.frame()
-      colnames(nonData) <- c("Date","Day","月份","交易量(公斤)","交易量(公噸)",
-                             "交易價","批發市場","品項", "前一天交易量(公斤)",
-                             "前一天交易價","交易量差(公斤)","交易價差",
-                             "交易量漲跌","交易價漲跌","有無原始資料")
+      nonData <- matrix(ncol = 15) %>% as.data.frame() %>%
+        `colnames<-`(c("Date","Day","月份","交易量(公斤)","交易量(公噸)",
+                       "交易價","批發市場","品項", "前一天交易量(公斤)",
+                       "前一天交易價","交易量差(公斤)","交易價差",
+                       "交易量漲跌","交易價漲跌","有無原始資料"))
       for (m in markets) {
           for (c in category) {
               check <- df() %>% filter((品項 == c) & (批發市場 == m))
             
-              if(NROW(check) == 0){
-                nonData <- everyday() %>%
-                  mutate(
-                    Date = as.character(Date),
-                    Day = as.numeric(Day),
-                    月份 = as.numeric(月份),
-                    批發市場 = as.character(m),
-                    品項 = as.character(c),
-                    `交易量(公斤)` = NA, 
-                    `交易量(公噸)` = NA, 
-                    交易價 = NA,
-                    `前一天交易量(公斤)` = NA,
-                    `前一天交易價` = NA,
-                    `交易量差(公斤)` = NA,
-                    `交易價差` = NA,
-                    `交易量漲跌` = NA,
-                    `交易價漲跌` = NA,
-                    `有無原始資料` = FALSE
-                  ) %>%
-                  rbind(nonData,.)
+              if(sum(!is.na(check$`交易量(公噸)`)) == 0){
+                nonData <- rbind(check, nonData)
               }else{
                 next()
               }
           }
       }
-      
-        nonData <- nonData[-1,]
+    #  
+        #nonData <- nonData[-1,]
         nonData
     })
     
     # final all date data
     finalAllDayTrade <- reactive({
-        if (NROW(nondf()) == 0){
-          df() %>% .[order(.$批發市場),]
-        }else{
-          bind_rows(df(), nondf()) %>% .[order(.$批發市場),]
-        }
+        df() %>% .[order(.$批發市場),]
     })
     
     # 無原始資料的日資料
@@ -228,7 +207,7 @@ server <- function(input, output){
     
     # 原始資料
     output$originData <- DT::renderDataTable({
-        finalAllDayTrade() %>% .[,c(1:7)] %>% .[which(!is.na(.$`交易量(公斤)`)),]
+        finalAllDayTrade() %>% .[,c(1:8)] %>% .[which(!is.na(.$`交易量(公斤)`)),]
     })
     
     # 所有日資料
