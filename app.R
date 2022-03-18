@@ -88,9 +88,9 @@ server <- function(input, output){
     everyday <- reactive({
       # create a dataframe include all dates 
       DayTrade <- data.frame(
-        year = c(input$startyr:input$endyr),
-        month = rep(1:12, length(c(input$startyr:input$endyr))),
-        day = rep(1:31, (input$endyr-input$startyr+1)*12)
+        day = rep(1:31, times = length(c(input$startyr:input$endyr))*12),
+        month = rep(1:12, each = 31),
+        year = rep(c(input$startyr:input$endyr), each = 31*12)
       ) %>%
         .[-c(which(.$month %in% c(4,6,9,11) & (.$day > 30)),
              which((.$month == 2) & (.$year %% 4 == 0) & (.$day > 29)),
@@ -110,9 +110,9 @@ server <- function(input, output){
         req(input$files)
       
         # input all data
-        all_pq <- matrix(ncol = 8) %>% as.data.frame()
-        colnames(all_pq) <- c("Date","Day","月份","交易量(公斤)","交易量(公噸)",
-                              "交易價","批發市場","品項")
+        all_pq <- matrix(ncol = 8) %>% as.data.frame() %>%
+          `colnames<-`(c("Date","Day","月份","交易量(公斤)","交易量(公噸)",
+                         "交易價","批發市場","品項"))
         
         for(i in 1:length(input$files[,1])){
             all_pq <- readxl::read_excel(input$files[[i, 'datapath']],
@@ -151,7 +151,7 @@ server <- function(input, output){
                 rbind(all_pq, .)
         }
         
-        all_pq <- all_pq[-1,] %>%
+        all_pq <- all_pq %>%
             group_by(批發市場, 品項) %>%
             mutate(
                 `前一天交易量(公斤)` = lag(`交易量(公斤)`),
@@ -159,7 +159,7 @@ server <- function(input, output){
                 `交易量差(公斤)` = `交易量(公斤)` - `前一天交易量(公斤)`,
                 `交易價差` = `交易價` - `前一天交易價`,
                 `交易量漲跌` = `交易量差(公斤)`/`前一天交易量(公斤)`,
-                `交易價漲跌` = `交易價差`/`前一天交易價`,
+               `交易價漲跌` = `交易價差`/`前一天交易價`,
                 月份 = as.numeric(月份),
                 `有無原始資料` = ifelse(is.na(`交易量(公斤)`),FALSE,TRUE)
             ) 
