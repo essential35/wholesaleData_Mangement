@@ -39,27 +39,11 @@ ui <- fluidPage(
 
             tags$hr(),
             
-            div(
-                checkboxGroupInput("VarCheck",
-                                   h4("次數分配表變數選擇："),
-                                   choices = c("交易量(公斤)" = 1,
-                                               "交易價" = 2,
-                                               "交易量漲跌" = 3,
-                                               "交易價漲跌" = 4
-                                   ),
-                                   selected = 1)
-            ),
-            tags$hr(),
-            
             h3("Download"),
             # 下載合併資料
             h5("- 合併資料下載："),
             # download data button
-            downloadButton("dl", "Combine Data"),
-            
-            # 下載所有結果
-            h5("- 所有結果下載："),
-            downloadButton("dl2","All Result")
+            downloadButton("dl", "Combine Data")
         ),
 
         # Show a plot of the generated distribution
@@ -70,13 +54,7 @@ ui <- fluidPage(
                 tabPanel("所有日資料",
                          DT::dataTableOutput(outputId = "allDayData")),
                 tabPanel("無原始資料的日資料",
-                         DT::dataTableOutput(outputId = "nonData")),
-                tabPanel("次數分配表",
-                         h3("上下限 & 組距"),
-                         DT::dataTableOutput(outputId = "intervals"),
-                         br(),
-                         h3("次數分配表"),
-                         DT::dataTableOutput(outputId = "freqDistriTable"))
+                         DT::dataTableOutput(outputId = "nonData"))
             )
         )
     )
@@ -168,32 +146,32 @@ server <- function(input, output){
     })
     
     # 無原始資料的日資料
-    nondf <- reactive({
+    #nondf <- reactive({
       
       # 無原始資料
-      markets <- df()$批發市場 %>% as.factor %>% levels
-      category <- df()$品項 %>% as.factor %>% levels
-      
-      nonData <- matrix(ncol = 15) %>% as.data.frame() %>%
-        `colnames<-`(c("Date","Day","月份","交易量(公斤)","交易量(公噸)",
-                       "交易價","批發市場","品項", "前一天交易量(公斤)",
-                       "前一天交易價","交易量差(公斤)","交易價差",
-                       "交易量漲跌","交易價漲跌","有無原始資料"))
-      for (m in markets) {
-          for (c in category) {
-              check <- df() %>% filter((品項 == c) & (批發市場 == m))
-            
-              if(sum(!is.na(check$`交易量(公噸)`)) == 0){
-                nonData <- rbind(check, nonData)
-              }else{
-                next()
-              }
-          }
-      }
+    #  markets <- df()$批發市場 %>% as.factor %>% levels
+    #  category <- df()$品項 %>% as.factor %>% levels
+    #  
+    #  nonData <- matrix(ncol = 15) %>% as.data.frame() %>%
+    #    `colnames<-`(c("Date","Day","月份","交易量(公斤)","交易量(公噸)",
+    #                   "交易價","批發市場","品項", "前一天交易量(公斤)",
+    #                   "前一天交易價","交易量差(公斤)","交易價差",
+    #                   "交易量漲跌","交易價漲跌","有無原始資料"))
+    #  for (m in markets) {
+    #      for (c in category) {
+    #          check <- df() %>% filter((品項 == c) & (批發市場 == m))
+    #        
+    #          if(sum(!is.na(check$`交易量(公噸)`)) == 0){
+    #            nonData <- rbind(check, nonData)
+    #          }else{
+    #            next()
+    #          }
+    #     }
+    #  }
     #  
         #nonData <- nonData[-1,]
-        nonData
-    })
+    #    nonData
+    #})
     
     # final all date data
     finalAllDayTrade <- reactive({
@@ -201,9 +179,9 @@ server <- function(input, output){
     })
     
     # 無原始資料的日資料
-    output$nonData <- DT::renderDataTable({
-        nondf() 
-    })
+    #output$nonData <- DT::renderDataTable({
+    #    nondf() 
+    #})
     
     # 原始資料
     output$originData <- DT::renderDataTable({
@@ -215,60 +193,6 @@ server <- function(input, output){
         finalAllDayTrade()
     })
     
-    # 上下限 & 間距
-    interval_df <- reactive({
-        source("intergroup.R")  # 引入function: group_inter() 
-        inter_df <- group_inter(df()) 
-        inter_df
-    })
-    
-    output$intervals <- DT::renderDataTable({
-        interval_df() %>%
-            .[which(.$group %in% as.numeric(input$VarCheck)),] %>%
-            select(-group) %>%
-            tidyr::spread(., key = variable, value = num)
-    })
-    
-    # 次數分配表
-    freq_df <- reactive({
-        
-        FreqOutputTable <- matrix(ncol = 6) %>% as.data.frame() 
-        colnames(FreqOutputTable) <- c("Month", "區間", "次數", 
-                                       "批發市場", "品項", "變數")
-        
-        
-        source("frequency_table.R")  
-        # 引入function：freq_group(品項,批發市場,間距資料,所有日交易資料,變數選擇數字)
-        
-        markets <- df()$批發市場 %>% as.factor %>% levels
-        category <- df()$品項 %>% as.factor %>% levels
-       
-        for (v in as.numeric(input$VarCheck)) {
-          for (mkt in markets) {
-              for (c in category) {
-                  
-                  inter_df <- interval_df() %>% 
-                      filter((品項 == c) & (批發市場 == mkt))
-                  
-                  if(NROW(inter_df) == 0){
-                      next()  # if there has no data, then continuously run the next loop.
-                  }else{
-                    
-                      FreqOutputTable <- freq_group(c, mkt, inter_df, df(), v) %>%
-                          rbind(FreqOutputTable, .)
-                    
-                  }
-              }
-          }
-        }
-        
-        FreqOutputTable <- FreqOutputTable[-1,]
-        FreqOutputTable
-    })
-    
-    output$freqDistriTable <- DT::renderDataTable({
-        freq_df()
-    })
     
     # download data
     output$dl <- downloadHandler(
@@ -277,32 +201,27 @@ server <- function(input, output){
         },
         content = function(file) {
             all_pq2 <- list(
-                `原始檔` = finalAllDayTrade() %>% .[,c(1:7)] %>%
-                    .[which(!is.na(.$`交易量(公斤)`)),] %>% .[order(.$批發市場),],
-                `日交易_含漲跌幅` = finalAllDayTrade()
+                `原始檔_台北一～西螺鎮` = finalAllDayTrade() %>% 
+                    .[which(!is.na(.$`交易量(公斤)`)),] %>% .[order(.$批發市場),] %>%
+                    filter(批發市場 %in% c("台北一","台北二","板橋區","三重區","宜蘭市",
+                                       "桃農","台中市","豐原區","永靖鄉","溪湖鎮","南投市",
+                                       "西螺鎮")),
+                `原始檔_高雄市～花蓮市` = finalAllDayTrade() %>%
+                    .[which(!is.na(.$`交易量(公斤)`)),] %>% .[order(.$批發市場),] %>%
+                    filter(!(批發市場 %in% c("台北一","台北二","板橋區","三重區","宜蘭市",
+                                       "桃農","台中市","豐原區","永靖鄉","溪湖鎮","南投市",
+                                       "西螺鎮"))),
+                `日交易_含漲跌幅_台北一～西螺鎮` = finalAllDayTrade() %>%
+                    filter(批發市場 %in% c("台北一","台北二","板橋區","三重區","宜蘭市",
+                                       "桃農","台中市","豐原區","永靖鄉","溪湖鎮","南投市",
+                                       "西螺鎮")),
+                `日交易_含漲跌幅_高雄市～花蓮市` = finalAllDayTrade() %>%
+                  filter(!(批發市場 %in% c("台北一","台北二","板橋區","三重區","宜蘭市",
+                                     "桃農","台中市","豐原區","永靖鄉","溪湖鎮","南投市",
+                                     "西螺鎮")))
             )
             
             write.xlsx(x=all_pq2, file = file)
-        }
-    )
-
-    output$dl2 <- downloadHandler(
-        filename = function() {
-            "All_Results.xlsx"
-        },
-        content = function(file) {
-            all_pq3 <- list(
-                `原始檔` = finalAllDayTrade() %>% .[,c(1:7)] %>%
-                    .[which(!is.na(.$`交易量(公斤)`)),],
-                `日交易_含漲跌幅` = finalAllDayTrade(),
-                `上下限_間距` = interval_df() %>%
-                    .[which(.$group %in% as.numeric(input$VarCheck)),] %>%
-                    select(-group) %>%
-                    tidyr::spread(., key = variable, value = num),
-                `次數分配表` = freq_df()
-            )
-            
-            write.xlsx(x=all_pq3, file = file)
         }
     )
 
